@@ -129,10 +129,26 @@ register database => sub {
     }
 };
 
-register_hook(qw(database_connected
-                 database_connection_lost
-                 database_connection_failed
-                 database_error));
+register_hook(qw(
+	database_connected
+	database_connection_lost
+	database_connection_failed
+	database_error
+
+	before_db_query
+	before_db_insert
+	before_db_update
+	before_db_delete
+	before_db_lookup
+	before_db_select
+	
+	after_db_query
+	after_db_update
+	after_db_delete
+	after_db_insert
+	after_db_select
+	after_db_lookup
+));
 register_plugin(for_versions => ['1', '2']);
 
 # Given the settings to use, try to get a database connection

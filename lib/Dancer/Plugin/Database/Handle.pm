@@ -1,7 +1,9 @@
 package Dancer::Plugin::Database::Handle;
 
 use strict;
-use Carp;
+use Dancer ':syntax';
+use Dancer::Plugin;
+use Carp qw(carp cluck confess croak);
 use DBI;
 use base qw(DBI::db);
 
@@ -178,10 +180,18 @@ the results.
 
 sub quick_lookup {
     my ($self, $table_name, $where, $data) = @_;
+
+	execute_hook('before_db_lookup', { args => \@_ } )
+		unless $table_name =~ /^!/;
+
     my $opts = { columns => [$data] };
     my $row = $self->_quick_query('SELECT', $table_name, $opts, $where);
+	my $retval = ( $row && exists $row->{$data} ) ? $row->{$data} : undef;
+	
+	execute_hook('after_db_lookup', { args => \@_, retval => \$retval } )
+		unless $table_name =~ /^!/;
 
-    return ( $row && exists $row->{$data} ) ? $row->{$data} : undef;
+	return $retval;
 }
 
 # The 3rd arg, $data, has a different meaning depending on the type of query
@@ -191,18 +201,18 @@ sub quick_lookup {
 # For DELETE queries, it's unused.
 sub _quick_query {
     my ($self, $type, $table_name, $data, $where) = @_;
-    
+	my $do_hooks = 1;
+
     if ($type !~ m{^ (SELECT|INSERT|UPDATE|DELETE) $}x) {
         carp "Unrecognised query type $type!";
         return;
     }
+
     if (!$table_name || ref $table_name) {
         carp "Expected table name as a straight scalar";
         return;
     }
-    if (($type eq 'INSERT' || $type eq 'UPDATE')
-        && (!$data || ref $data ne 'HASH')) 
-    {
+    if (($type eq 'INSERT' || $type eq 'UPDATE') && (!$data || ref $data ne 'HASH')) {
         carp "Expected a hashref of changes";
         return;
     }
@@ -211,6 +221,14 @@ sub _quick_query {
         carp "Expected where conditions";
         return;
     }
+
+	$do_hooks = 0
+		if ($table_name =~ s/^!//);
+
+	if ($do_hooks) {
+		execute_hook('before_db_query', { args => \@_ });
+		execute_hook('before_db_' . lc($type), { args => \@_ });
+	}
 
     my $which_cols = '*';
     my $opts = $type eq 'SELECT' && $data ? $data : {};
@@ -322,6 +340,11 @@ sub _quick_query {
             } @bind_params
         );
     }
+
+	if ($do_hooks) {
+		execute_hook('after_db_query', { args => \@_, sql => \$sql, params => \@bind_params });
+		execute_hook('after_db_' . lc($type), { args => \@_, sql => \$sql, params => \@bind_params });
+	}
 
     # Select queries, in scalar context, return the first matching row; in list
     # context, they return a list of matching rows.
