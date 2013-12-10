@@ -99,10 +99,7 @@ sub _get_connection {
         my $param = $param_for_driver{$driver};
 
         if ($param && !$settings->{dbi_params}{$param}) {
-            $logger->(
-                debug => "Adding $param to DBI connection params"
-                    . " to enable UTF-8 support"
-            );
+			debug "Adding $param to DBI connection params to enable UTF-8 support";
             $settings->{dbi_params}{$param} = 1;
         }
     }
@@ -118,7 +115,7 @@ sub _get_connection {
     );
 
     if (!$dbh) {
-        $logger->(error => "Database connection failed - " . $DBI::errstr);
+        error "Database connection failed - " . $DBI::errstr;
         execute_hook('database_connection_failed', $settings);
         return;
     } elsif (exists $settings->{on_connect_do}) {
@@ -127,7 +124,7 @@ sub _get_connection {
             : [ $settings->{on_connect_do} ];
         for (@$to_do) {
             $dbh->do($_) or
-              $logger->(error => "Failed to perform on-connect command $_");
+              error "Failed to perform on-connect command $_";
         }
     }
 
@@ -187,10 +184,7 @@ sub _get_settings {
     if (!defined $name) {
         $return_settings = { %$settings };
         if (!$return_settings->{driver} && !$return_settings->{dsn}) {
-            $logger->('error',
-                "Asked for default connection (no name given)"
-                ." but no default connection details found in config"
-            );
+            error "Asked for default connection (no name given) but no default connection details found in config";
         }
     } else {
         # If there are no named connections in the config, bail now:
@@ -203,10 +197,7 @@ sub _get_settings {
             $return_settings = { %$named_settings };
         } else {
             # OK, didn't match anything
-            $logger->('error',
-                      "Asked for a database handle named '$name' but no matching  "
-                      ."connection details found in config"
-            );
+            error "Asked for a database handle named '$name' but no matching connection details found in config";
         }
     }
 
